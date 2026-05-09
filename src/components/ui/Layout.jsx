@@ -1,84 +1,62 @@
-// src/components/ui/Layout.jsx
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, Outlet, useNavigate } from 'react-router-dom';
 
-export function Layout({ children }) {
-  // Obtenemos la ruta actual para cambiar el título dinámicamente
-  const location = useLocation();
+export const Layout = () => {
+    const navigate = useNavigate();
+    const nombre = localStorage.getItem('nombre') || 'Usuario';
+    const rol = localStorage.getItem('rol');
 
-  // Definimos nuestro menú en un array para que sea fácil agregar más opciones luego
-  const menuItems = [
-    { path: "/mesas", name: "Mesas", icon: "🪑" },
-    { path: "/pedidos", name: "Pedidos", icon: "📋" },
-    { path: "/productos", name: "Productos", icon: "📦" },
-    { path: "/categorias", name: "Categorías", icon: "🏷️" },
-  ];
+    const handleLogout = () => {
+        localStorage.clear();
+        navigate('/login');
+    };
 
-  // Buscamos el nombre de la página actual, si no lo encuentra pone "Panel"
-  const paginaActual = menuItems.find(item => item.path === location.pathname)?.name || "Panel";
+    return (
+        <div className="flex min-h-screen bg-gradient-to-t from-slate-100 via-blue-50 to-slate-100">
+            {/* Sidebar */}
+            <aside className="w-64 bg-gradient-to-b from-slate-800 to-slate-900 text-white fixed h-full flex flex-col shadow-xl rounded-tr-3xl rounded-br-3xl">
+                <div className="p-6 text-3xl font-extrabold text-blue-400 border-b border-slate-700 tracking-tight">
+                    <span>EL GALÁN 🍽️</span>
+                </div>
+                <nav className="flex-1 p-4 space-y-4 overflow-y-auto">
+                    <Link to="/mesas" className="flex items-center space-x-3 p-3 rounded-md hover:bg-slate-700 transition-all duration-300 hover:text-blue-300">
+                        <span>📍</span><span>Mapa de Mesas</span>
+                    </Link>
+                    <Link to="/pedidos" className="flex items-center space-x-3 p-3 rounded-md hover:bg-slate-700 transition-all duration-300 hover:text-blue-300">
+                        <span>📝</span><span>Pedidos / Cocina</span>
+                    </Link>
+                    <Link to="/productos" className="flex items-center space-x-3 p-3 rounded-md hover:bg-slate-700 transition-all duration-300 hover:text-blue-300">
+                        <span>🍔</span><span>Productos</span>
+                    </Link>
+                    <Link to="/categorias" className="flex items-center space-x-3 p-3 rounded-md hover:bg-slate-700 transition-all duration-300 hover:text-blue-300">
+                        <span>📁</span><span>Categorías</span>
+                    </Link>
 
-  // Generamos la fecha de hoy de forma dinámica
-  const fechaHoy = new Date().toLocaleDateString("es-ES", {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+                    {rol === 'Administrador' && (
+                        <Link to="/usuarios" className="flex items-center space-x-3 p-3 rounded-md hover:bg-slate-700 transition-all duration-300 text-blue-300 border-t border-slate-700 mt-4 pt-4">
+                            <span>👥</span><span>Gestión Personal</span>
+                        </Link>
+                    )}
+                </nav>
+                <div className="p-6 border-t border-slate-700 bg-slate-800 rounded-b-xl">
+                    <div className="mb-3">
+                        <p className="text-xs text-slate-500 uppercase font-semibold">Sesión:</p>
+                        <p className="text-sm text-blue-200 font-semibold">{nombre}</p>
+                    </div>
+                    <button 
+                        onClick={handleLogout} 
+                        className="w-full bg-red-600 text-white p-3 rounded-md hover:bg-red-700 hover:text-white transition-all duration-300 font-bold shadow-lg mt-4"
+                    >
+                        Cerrar Sesión
+                    </button>
+                </div>
+            </aside>
 
-  return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col fixed h-full z-20">
-        <div className="p-6">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <span className="text-blue-600">🍽️</span> Restobar<span className="text-blue-600">PRO</span>
-          </h1>
+            {/* Contenido Principal */}
+            <main className="flex-1 ml-64 p-10">
+                <div className="bg-white rounded-2xl shadow-xl p-6 transition-all duration-300 transform hover:scale-105">
+                    <Outlet />
+                </div>
+            </main>
         </div>
-        
-        <nav className="flex-1 px-4 space-y-2">
-          {menuItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                `w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-                  isActive
-                    ? "bg-blue-50 text-blue-700 font-bold"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                }`
-              }
-            >
-              <span>{item.icon}</span>
-              {item.name}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="p-6 border-t border-slate-100">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600">
-              AD
-            </div>
-            <span className="text-sm font-medium text-slate-600">Admin</span>
-          </div>
-        </div>
-      </aside>
-
-      {/* CONTENIDO PRINCIPAL */}
-      {/* Añadimos ml-64 (margin-left) porque el sidebar ahora es fixed (fijo) */}
-      <main className="flex-1 ml-64 flex flex-col min-h-screen">
-        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10 flex items-center justify-between px-8">
-          <h2 className="text-lg font-semibold text-slate-700 capitalize">
-            Gestión de {paginaActual}
-          </h2>
-          <div className="text-sm text-slate-400 font-medium capitalize">
-            {fechaHoy}
-          </div>
-        </header>
-        
-        <section className="p-8 flex-1">
-          {children}
-        </section>
-      </main>
-    </div>
-  );
-}
+    );
+};

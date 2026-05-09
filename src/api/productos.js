@@ -1,20 +1,47 @@
-import axios from "axios";
+import api from './axiosConfig';
 
-const API_URL = "https://localhost:7248/api/Productos";
+// --- LECTURA ---
+export const getProductos = async () => {
+    const response = await api.get('/Productos');
+    return response.data;
+};
 
-export const getTodosLosProductos = () => axios.get(API_URL);
-export const getProductosActivos = () => axios.get(`${API_URL}/activos`);
-export const getAlertasStock = () => axios.get(`${API_URL}/alertas`);
+export const getProductosActivos = async () => {
+    const response = await api.get('/Productos/activos');
+    return response.data;
+};
 
-export const crearProducto = (data) => axios.post(API_URL, data);
+export const getAlertasStock = async () => {
+    const response = await api.get('/Productos/alertas');
+    return response.data;
+};
 
-export const cambiarEstadoProducto = (id, nuevoEstado) => 
-    axios.put(`${API_URL}/${id}/estado`, nuevoEstado, {
-        headers: { "Content-Type": "application/json" }
+// --- ESCRITURA (Admin) ---
+export const crearProducto = async (crearProductoDto) => {
+    const response = await api.post('/Productos', crearProductoDto);
+    return response.data;
+};
+
+// [FromBody] int
+export const actualizarStock = async (id, cantidadNueva) => {
+    const response = await api.put(`/Productos/${id}/stock`, cantidadNueva, {
+        headers: { 'Content-Type': 'application/json' }
     });
+    return response.data;
+};
 
-// Nueva función para el Admin
-export const actualizarStock = (id, cantidad) => 
-    axios.put(`${API_URL}/${id}/stock`, cantidad, {
-        headers: { "Content-Type": "application/json" }
+// [FromBody] bool
+export const cambiarDisponibilidad = async (id, activo) => {
+    const response = await api.put(`/Productos/${id}/estado`, activo, {
+        headers: { 'Content-Type': 'application/json' }
     });
+    return response.data;
+};
+
+// [FromBody] decimal
+export const cambiarPrecio = async (id, nuevoPrecio) => {
+    const response = await api.put(`/Productos/${id}/precio`, nuevoPrecio, {
+        headers: { 'Content-Type': 'application/json' }
+    });
+    return response.data;
+};

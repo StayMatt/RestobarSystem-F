@@ -1,14 +1,12 @@
-// src/api/categorias.js
-import axios from "axios";
+import api from './axiosConfig';
 
-const API_URL = "https://localhost:7248/api/Categorias";
-
-// Exportación nombrada (con 'export' al inicio) para getCategorias
-export const getCategorias = () => {
-  return axios.get(API_URL);
+export const getCategorias = async () => {
+    const response = await api.get('/Categorias');
+    return response.data; // Retorna la lista de CategoriaDTO
 };
 
-// Exportación nombrada para crearCategoria
-export const crearCategoria = (data) => {
-  return axios.post(API_URL, data);
+export const crearCategoria = async (crearCategoriaDto) => {
+    // crearCategoriaDto debe ser exactamente: { Nombre: "string" }
+    const response = await api.post('/Categorias', crearCategoriaDto);
+    return response.data;
 };

@@ -1,172 +1,188 @@
-// src/views/MesasPage.jsx
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom"; // 1. Importamos el hook de navegación
-import { getMesas, crearMesa, cambiarEstado, eliminarMesa } from "../api/mesas";
-import { abrirPedido } from "../api/pedidos"; // 2. Importamos la función para abrir pedido
-import { MesaCard } from "../components/mesas/MesaCard";
-import { MesaModal } from "../components/mesas/MesaModal";
-import toast from "react-hot-toast";
+import { useEffect, useState } from 'react';
+import { getMesas, eliminarMesa } from '../api/mesas';
+import { abrirMesa, enviarComanda, getCuenta, cerrarPedido } from '../api/pedidos';
+import { getProductosActivos } from '../api/productos';
+import toast from 'react-hot-toast';
 
-export function MesasPage() {
-  const navigate = useNavigate(); // 3. Inicializamos el navegador
+export const MesasPage = () => {
+    // --- ESTADOS ---
+    const [mesas, setMesas] = useState([]);
+    const [productos, setProductos] = useState([]);
+    const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
+    
+    // Modales
+    const [showMenu, setShowMenu] = useState(false);
+    const [showOpciones, setShowOpciones] = useState(false);
+    const [showCuenta, setShowCuenta] = useState(false);
+    
+    // Datos de trabajo
+    const [carrito, setCarrito] = useState([]);
+    const [cuentaData, setCuentaData] = useState(null);
 
-  const [mesas, setMesas] = useState([]);
-  const [numero, setNumero] = useState("");
-  const [filtro, setFiltro] = useState("Todos");
-  const [loading, setLoading] = useState(false);
-  const [openModal, setOpenModal] = useState(false);
+    const rol = localStorage.getItem('rol');
+    const usuarioId = parseInt(localStorage.getItem('usuarioId') || '1');
 
-  const cargarMesas = async () => {
-    setLoading(true);
-    try {
-      const res = await getMesas();
-      setMesas(res.data || []);
-    } catch (error) {
-      toast.error("Error al cargar mesas");
-    } finally {
-      setLoading(false);
-    }
-  };
+    const cargarDatos = async () => {
+        try {
+            const [m, p] = await Promise.all([getMesas(), getProductosActivos()]);
+            setMesas(m);
+            setProductos(p);
+        } catch (e) { toast.error("Error de conexión"); }
+    };
 
-  useEffect(() => {
-    cargarMesas();
-  }, []);
+    useEffect(() => { cargarDatos(); }, []);
 
-  // 4. Nueva función para manejar el clic en la mesa
-  const handleMesaClick = async (mesa) => {
-    if (mesa.estado === "Libre") {
-      try {
-        // Llamamos a la API para abrir el pedido
-        const res = await abrirPedido(mesa.id);
-        const pedidoNuevo = res.data; 
-        
-        // Cambiamos el estado de la mesa a Ocupada en la DB
-        await cambiarEstado(mesa.id, "Ocupada");
-        
-        toast.success(`Mesa ${mesa.numero} abierta`);
-        // Navegamos a la toma de pedidos pasando el ID del pedido o de la mesa
-        navigate(`/pedidos/${mesa.id}`); 
-      } catch (error) {
-        toast.error("No se pudo abrir la mesa");
-      }
-    } else {
-      // Si ya está ocupada, vamos de frente a ver el pedido existente
-      navigate(`/pedidos/${mesa.id}`);
-    }
-  };
+    // --- LÓGICA DE CLIC EN MESA ---
+    const handleMesaClick = async (mesa) => {
+        if (mesa.estado === 'Libre') {
+            // FLUJO A: ABRIR MESA
+            try {
+                const pedidoId = await abrirMesa(mesa.id, usuarioId);
+                setMesaSeleccionada({ ...mesa, pedidoActivoId: pedidoId });
+                setCarrito([]);
+                setShowMenu(true);
+                cargarDatos();
+            } catch (e) { toast.error("No se pudo abrir la mesa"); }
+        } else {
+            // FLUJO B: MESA OCUPADA (Usa el PedidoActivoId que agregamos al DTO)
+            setMesaSeleccionada(mesa);
+            setShowOpciones(true);
+        }
+    };
 
-  const handleCrear = async () => {
-    if (!numero) return toast.error("Ingresa un número");
-    try {
-      await crearMesa({ numero: parseInt(numero), estado: "Libre" });
-      toast.success("Mesa creada");
-      setNumero("");
-      setOpenModal(false);
-      cargarMesas();
-    } catch (error) {
-      toast.error("Error al crear mesa");
-    }
-  };
+    // --- ACCIONES MESA OCUPADA ---
+    const handleVerCuenta = async () => {
+        try {
+            const data = await getCuenta(mesaSeleccionada.pedidoActivoId);
+            setCuentaData(data);
+            setShowOpciones(false);
+            setShowCuenta(true);
+        } catch (e) { toast.error("Error al cargar la cuenta"); }
+    };
 
-  const toggleEstado = async (mesa) => {
-    try {
-      const nuevoEstado = mesa.estado === "Libre" ? "Ocupada" : "Libre";
-      await cambiarEstado(mesa.id, nuevoEstado);
-      toast.success(`Mesa ${mesa.numero} ahora está ${nuevoEstado}`);
-      cargarMesas();
-    } catch (error) {
-      toast.error("Error al actualizar");
-    }
-  };
+    const handleAgregarMas = () => {
+        setCarrito([]);
+        setShowOpciones(false);
+        setShowMenu(true);
+    };
 
-  const handleDelete = async (id) => {
-    if (!confirm("¿Eliminar mesa?")) return;
-    try {
-      await eliminarMesa(id);
-      toast.success("Mesa eliminada");
-      cargarMesas();
-    } catch (error) {
-      toast.error("No se pudo eliminar");
-    }
-  };
+    // --- FINALIZAR PROCESOS ---
+    const handleEnviarComanda = async () => {
+        if (carrito.length === 0) return toast.error("Carrito vacío");
+        try {
+            const items = carrito.map(i => ({ ProductoId: i.id, Cantidad: i.cantidad, Notas: i.notas }));
+            await enviarComanda(mesaSeleccionada.pedidoActivoId, items);
+            toast.success("Comanda enviada");
+            setShowMenu(false);
+            cargarDatos();
+        } catch (e) { toast.error("Error al enviar pedido"); }
+    };
 
-  const mesasFiltradas = filtro === "Todos" 
-    ? mesas 
-    : mesas.filter((m) => m.estado === filtro);
+    const handleCerrarMesa = async (metodo) => {
+        try {
+            await cerrarPedido(mesaSeleccionada.pedidoActivoId, metodo);
+            toast.success("Mesa liberada");
+            setShowCuenta(false);
+            cargarDatos();
+        } catch (e) { toast.error("Error al cerrar caja"); }
+    };
 
-  return (
-    <div>
-      {/* STATS CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-sm font-medium text-slate-500">Total Mesas</p>
-          <p className="text-3xl font-bold text-slate-800">{mesas.length}</p>
-        </div>
-        <div className="bg-emerald-500 p-6 rounded-2xl shadow-lg shadow-emerald-200">
-          <p className="text-sm font-medium text-emerald-100">Disponibles</p>
-          <p className="text-3xl font-bold text-white">{mesas.filter(m => m.estado === "Libre").length}</p>
-        </div>
-        <div className="bg-orange-500 p-6 rounded-2xl shadow-lg shadow-orange-200">
-          <p className="text-sm font-medium text-orange-100">Ocupadas</p>
-          <p className="text-3xl font-bold text-white">{mesas.filter(m => m.estado === "Ocupada").length}</p>
-        </div>
-      </div>
+    return (
+        <div className="p-6 space-y-8">
+            <h1 className="text-3xl font-black text-slate-800">📍 Salón "El Galán"</h1>
 
-      {/* BARRA DE ACCIONES */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
-        <div className="flex bg-white p-1 rounded-xl border border-slate-200">
-          {["Todos", "Libre", "Ocupada"].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFiltro(f)}
-              className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
-                filtro === f 
-                  ? "bg-slate-100 text-slate-900 shadow-sm" 
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              {f === "Libre" ? "Libres" : f === "Ocupada" ? "Ocupadas" : f}
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={() => setOpenModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
-        >
-          <span className="text-xl">+</span> Nueva Mesa
-        </button>
-      </div>
-
-      {/* LOADING STATE */}
-      {loading && (
-        <div className="flex justify-center py-10">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-        </div>
-      )}
-
-      {/* GRID: Aquí pasamos la nueva función handleMesaClick */}
-      {!loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 cursor-pointer">
-          {mesasFiltradas.map((m) => (
-            <div key={m.id} onClick={() => handleMesaClick(m)}>
-              <MesaCard 
-                mesa={m} 
-                onToggle={(e) => { e.stopPropagation(); toggleEstado(m); }} 
-                onDelete={(id) => { window.event.stopPropagation(); handleDelete(id); }} 
-              />
+            {/* GRILLA DE MESAS */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {mesas.map(m => (
+                    <div key={m.id} onClick={() => handleMesaClick(m)} 
+                         className={`p-6 rounded-[2rem] border-4 cursor-pointer transition-all hover:scale-105 shadow-sm ${m.estado === 'Libre' ? 'bg-white border-green-500 text-slate-700' : 'bg-orange-500 border-orange-600 text-white'}`}>
+                        <div className="flex justify-between font-black text-2xl">
+                            #{m.numero}
+                            <span className="text-[10px] uppercase">{m.estado}</span>
+                        </div>
+                        <p className="text-xs font-bold mt-2 opacity-80">Capacidad: {m.capacidad}</p>
+                        {m.horaApertura && <p className="text-[10px] mt-1 bg-black/10 rounded px-1 w-fit">Desde: {new Date(m.horaApertura).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>}
+                    </div>
+                ))}
             </div>
-          ))}
-        </div>
-      )}
 
-      <MesaModal 
-        isOpen={openModal} 
-        onClose={() => setOpenModal(false)} 
-        onSave={handleCrear} 
-        numero={numero} 
-        setNumero={setNumero} 
-      />
-    </div>
-  );
-}
+            {/* MODAL 1: OPCIONES MESA OCUPADA */}
+            {showOpciones && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl w-80 space-y-4">
+                        <h2 className="text-center font-black text-xl">Mesa #{mesaSeleccionada.numero}</h2>
+                        <button onClick={handleAgregarMas} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700">➕ Agregar Pedido</button>
+                        <button onClick={handleVerCuenta} className="w-full bg-slate-100 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-200">🧾 Ver Cuenta / Cobrar</button>
+                        <button onClick={() => setShowOpciones(false)} className="w-full text-slate-400 font-bold py-2">Cancelar</button>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 2: MENÚ / CARTA (Para abrir o agregar más) */}
+            {showMenu && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white w-full max-w-5xl h-[80vh] rounded-[2.5rem] flex overflow-hidden shadow-2xl">
+                        <div className="flex-1 p-8 overflow-y-auto">
+                            <h2 className="text-2xl font-black mb-6">Carta Digital</h2>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {productos.map(p => (
+                                    <button key={p.id} onClick={() => {
+                                        const ex = carrito.find(i=>i.id===p.id);
+                                        if(ex) setCarrito(carrito.map(i=>i.id===p.id?{...i, cantidad: i.cantidad+1}:i));
+                                        else setCarrito([...carrito, { ...p, cantidad: 1, notas: "" }]);
+                                    }} className="p-4 border-2 rounded-2xl text-left hover:border-blue-500 transition">
+                                        <p className="font-bold truncate">{p.nombre}</p>
+                                        <p className="text-blue-600 font-black">S/. {p.precio.toFixed(2)}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="w-80 bg-slate-50 p-6 border-l flex flex-col">
+                            <h2 className="font-black text-lg mb-4">Comanda Mesa #{mesaSeleccionada.numero}</h2>
+                            <div className="flex-1 overflow-y-auto space-y-2">
+                                {carrito.map(i => (
+                                    <div key={i.id} className="bg-white p-3 rounded-xl border text-sm">
+                                        <div className="flex justify-between font-bold"><span>{i.nombre}</span><span>x{i.cantidad}</span></div>
+                                        <input className="w-full text-[10px] mt-1 border-b" placeholder="Notas..." onChange={e=>setCarrito(carrito.map(c=>c.id===i.id?{...c, notas: e.target.value}:c))}/>
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={handleEnviarComanda} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black mt-4">ENVIAR A COCINA</button>
+                            <button onClick={() => setShowMenu(false)} className="w-full text-slate-400 mt-2 font-bold">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 3: PRE-CUENTA Y CIERRE */}
+            {showCuenta && cuentaData && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md">
+                        <h2 className="text-center font-black text-2xl mb-6">Detalle de Cuenta</h2>
+                        <div className="space-y-3 mb-6 border-y py-4">
+                            {cuentaData.items.map((it, idx) => (
+                                <div key={idx} className="flex justify-between text-sm">
+                                    <span>{it.cantidad}x {it.nombre}</span>
+                                    <span className="font-mono">S/. {it.subtotal.toFixed(2)}</span>
+                                </div>
+                            ))}
+                            <div className="flex justify-between font-black text-xl pt-4 border-t">
+                                <span>TOTAL</span>
+                                <span>S/. {cuentaData.total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                        
+                        {(rol === 'Administrador' || rol === 'Cajera') && (
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => handleCerrarMesa("Efectivo")} className="bg-green-600 text-white py-3 rounded-xl font-bold">💵 Efectivo</button>
+                                <button onClick={() => handleCerrarMesa("Tarjeta")} className="bg-blue-600 text-white py-3 rounded-xl font-bold">💳 Tarjeta</button>
+                                <button onClick={() => handleCerrarMesa("Yape/Plin")} className="bg-purple-600 text-white py-3 rounded-xl font-bold col-span-2">📱 Yape / Plin</button>
+                            </div>
+                        )}
+                        <button onClick={() => setShowCuenta(false)} className="w-full text-slate-400 mt-4 font-bold">Cerrar</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};

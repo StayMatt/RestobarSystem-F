@@ -1,148 +1,204 @@
-import { useEffect, useState } from "react";
-import { getTodosLosProductos, crearProducto, cambiarEstadoProducto, actualizarStock } from "../api/productos";
-import { getCategorias } from "../api/categorias";
-import toast from "react-hot-toast";
+import { useEffect, useState } from 'react';
+import { getProductos, crearProducto, cambiarDisponibilidad } from '../api/productos';
+import { getCategorias } from '../api/categorias';
+import toast from 'react-hot-toast';
 
-export function ProductosPage() {
-  const [productos, setProductos] = useState([]);
-  const [categorias, setCategorias] = useState([]);
-  const [filtroEstado, setFiltroEstado] = useState("activos");
-  const [loading, setLoading] = useState(false);
-  const [openModal, setOpenModal] = useState(false);
+export const ProductosPage = () => {
+    const [productos, setProductos] = useState([]);
+    const [categorias, setCategorias] = useState([]);
+    const rol = localStorage.getItem('rol');
 
-  const [formulario, setFormulario] = useState({
-    nombre: "", precio: "", categoriaId: "", areaDestino: "Cocina",
-    stockActual: 0, stockMinimo: 5, controlaStock: true
-  });
+    // Estado exacto a tu CrearProductoDTO
+    const [form, setForm] = useState({
+        Nombre: '',
+        Descripcion: '',
+        ImagenUrl: '',
+        Costo: '',
+        Precio: '',
+        AreaDestino: 'Cocina', // Valor por defecto
+        StockActual: 0,
+        StockMinimo: 5,
+        ControlaStock: true,
+        CategoriaId: ''
+    });
 
-  const cargarDatos = async () => {
-    setLoading(true);
-    try {
-      const [resProd, resCat] = await Promise.all([getTodosLosProductos(), getCategorias()]);
-      setProductos(resProd.data || []);
-      setCategorias(resCat.data || []);
-    } catch (error) {
-      toast.error("Error de conexión con el servidor");
-    } finally {
-      setLoading(false);
-    }
-  };
+    const cargarDatos = async () => {
+        try {
+            const [dataProductos, dataCategorias] = await Promise.all([
+                getProductos(),
+                getCategorias()
+            ]);
+            setProductos(dataProductos);
+            setCategorias(dataCategorias);
+        } catch (error) {
+            toast.error("Error al cargar los datos");
+        }
+    };
 
-  useEffect(() => { cargarDatos(); }, []);
+    useEffect(() => { 
+        cargarDatos(); 
+    }, []);
 
-  const handleEditStock = async (id, actual) => {
-    const nuevaCantidad = prompt("Ingrese la nueva cantidad de stock:", actual);
-    if (nuevaCantidad !== null && !isNaN(nuevaCantidad)) {
-      try {
-        await actualizarStock(id, parseInt(nuevaCantidad));
-        toast.success("Stock actualizado");
-        cargarDatos();
-      } catch (e) { toast.error("Error al actualizar stock"); }
-    }
-  };
+    const handleCrear = async (e) => {
+        e.preventDefault();
+        try {
+            // Conversión estricta de tipos de datos para C#
+            const payload = {
+                Nombre: form.Nombre,
+                Descripcion: form.Descripcion || null,
+                ImagenUrl: form.ImagenUrl || null,
+                Costo: parseFloat(form.Costo || 0),
+                Precio: parseFloat(form.Precio || 0),
+                AreaDestino: form.AreaDestino,
+                StockActual: parseInt(form.StockActual || 0),
+                StockMinimo: parseInt(form.StockMinimo || 0),
+                ControlaStock: form.ControlaStock,
+                CategoriaId: parseInt(form.CategoriaId)
+            };
 
-  const handleCrear = async (e) => {
-    e.preventDefault();
-    try {
-      await crearProducto({
-        Nombre: formulario.nombre,
-        Precio: parseFloat(formulario.precio),
-        CategoriaId: parseInt(formulario.categoriaId),
-        AreaDestino: formulario.areaDestino,
-        StockActual: parseInt(formulario.stockActual),
-        StockMinimo: parseInt(formulario.stockMinimo),
-        ControlaStock: formulario.controlaStock,
-        Activo: true
-      });
-      toast.success("Producto creado");
-      setOpenModal(false);
-      cargarDatos();
-    } catch (error) { toast.error(error.response?.data || "Error al crear"); }
-  };
+            await crearProducto(payload);
+            toast.success("Producto añadido a la carta");
+            
+            // Limpiar formulario
+            setForm({
+                Nombre: '', Descripcion: '', ImagenUrl: '', Costo: '', Precio: '',
+                AreaDestino: 'Cocina', StockActual: 0, StockMinimo: 5, ControlaStock: true, CategoriaId: ''
+            });
+            cargarDatos();
+        } catch (error) {
+            const mensajeError = error.response?.data?.mensaje || "Error al crear producto";
+            toast.error(mensajeError);
+        }
+    };
 
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestión de Inventario</h2>
-        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
-          <button onClick={() => setFiltroEstado("activos")} className={`px-4 py-2 rounded-lg ${filtroEstado === 'activos' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Disponibles</button>
-          <button onClick={() => setFiltroEstado("inactivos")} className={`px-4 py-2 rounded-lg ${filtroEstado === 'inactivos' ? 'bg-white shadow text-red-600' : 'text-slate-500'}`}>Agotados</button>
+    const handleToggleActivo = async (id, estadoActual) => {
+        try {
+            await cambiarDisponibilidad(id, !estadoActual);
+            toast.success("Estado del producto actualizado");
+            cargarDatos();
+        } catch (error) {
+            toast.error("Error al cambiar disponibilidad");
+        }
+    };
+
+    return (
+        <div className="space-y-6 max-w-7xl mx-auto">
+            <h1 className="text-3xl font-black text-slate-800">🍔 Carta e Inventario</h1>
+
+            {/* SOLO EL ADMINISTRADOR PUEDE CREAR PRODUCTOS */}
+            {rol === 'Administrador' && (
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 className="text-sm font-bold text-blue-600 uppercase mb-4 tracking-widest">Añadir Nuevo Producto</h2>
+                    
+                    <form onSubmit={handleCrear} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="col-span-2">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Nombre</label>
+                            <input className="w-full border p-2.5 rounded-xl mt-1" type="text" value={form.Nombre} onChange={e => setForm({...form, Nombre: e.target.value})} required />
+                        </div>
+                        
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Categoría</label>
+                            <select className="w-full border p-2.5 rounded-xl mt-1 bg-white" value={form.CategoriaId} onChange={e => setForm({...form, CategoriaId: e.target.value})} required>
+                                <option value="">Seleccione...</option>
+                                {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Área Destino</label>
+                            <select className="w-full border p-2.5 rounded-xl mt-1 bg-white" value={form.AreaDestino} onChange={e => setForm({...form, AreaDestino: e.target.value})}>
+                                <option value="Cocina">Cocina</option>
+                                <option value="Bar">Bar</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Costo (S/.)</label>
+                            <input className="w-full border p-2.5 rounded-xl mt-1" type="number" step="0.01" value={form.Costo} onChange={e => setForm({...form, Costo: e.target.value})} required />
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Precio Venta (S/.)</label>
+                            <input className="w-full border p-2.5 rounded-xl mt-1" type="number" step="0.01" value={form.Precio} onChange={e => setForm({...form, Precio: e.target.value})} required />
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Stock Inicial</label>
+                            <input className="w-full border p-2.5 rounded-xl mt-1" type="number" value={form.StockActual} onChange={e => setForm({...form, StockActual: e.target.value})} required />
+                        </div>
+
+                        <div className="flex items-center h-full pb-2">
+                            <label className="flex items-center cursor-pointer">
+                                <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked={form.ControlaStock} onChange={e => setForm({...form, ControlaStock: e.target.checked})} />
+                                <span className="ml-2 text-sm font-bold text-slate-600">Controlar Stock</span>
+                            </label>
+                        </div>
+
+                        <div className="col-span-full mt-2">
+                            <button type="submit" className="w-full bg-blue-600 text-white font-black py-3 rounded-xl hover:bg-blue-700 transition shadow-md">
+                                Guardar Producto en la Carta
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* TABLA VISIBLE PARA TODOS LOS ROLES */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b">
+                            <tr className="text-[10px] uppercase text-slate-500 font-bold tracking-wider">
+                                <th className="p-4">Producto</th>
+                                <th className="p-4">Categoría</th>
+                                <th className="p-4">Área</th>
+                                <th className="p-4 text-right">Precio</th>
+                                <th className="p-4 text-center">Stock</th>
+                                <th className="p-4 text-center">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm">
+                            {productos.map(p => (
+                                <tr key={p.id} className="border-b hover:bg-slate-50 transition">
+                                    <td className="p-4 font-bold text-slate-800">{p.nombre}</td>
+                                    <td className="p-4 text-slate-500">{p.categoriaNombre}</td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${p.areaDestino === 'Cocina' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            {p.areaDestino}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-right font-mono font-bold text-blue-600">
+                                        S/. {p.precio.toFixed(2)}
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        {p.controlaStock ? (
+                                            <span className={`font-bold ${p.stockActual <= p.stockMinimo ? 'text-red-500' : 'text-slate-700'}`}>
+                                                {p.stockActual}
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-400 text-xs italic">N/A</span>
+                                        )}
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        {/* Solo Admin puede hacer clic para cambiar el estado */}
+                                        <button 
+                                            onClick={() => rol === 'Administrador' && handleToggleActivo(p.id, p.activo)}
+                                            disabled={rol !== 'Administrador'}
+                                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase transition ${
+                                                p.activo 
+                                                ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                                                : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                                            } ${rol !== 'Administrador' && 'cursor-default'}`}
+                                        >
+                                            {p.activo ? 'ACTIVO' : 'INACTIVO'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-        <button onClick={() => setOpenModal(true)} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold">+ Nuevo</button>
-      </div>
-
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 text-slate-400 text-xs uppercase">
-            <tr>
-              <th className="px-6 py-4">Producto</th>
-              <th className="px-6 py-4">Stock Actual</th>
-              <th className="px-6 py-4">Precio</th>
-              <th className="px-6 py-4 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {productos.filter(p => filtroEstado === 'activos' ? p.activo : !p.activo).map(p => (
-              <tr key={p.id}>
-                <td className="px-6 py-4 font-bold">
-                    {p.nombre}
-                    <p className="text-xs text-slate-400 font-normal">{p.categoria?.nombre}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <span className={`font-mono font-bold px-3 py-1 rounded-full ${p.controlaStock && p.stockActual <= p.stockMinimo ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                      {p.controlaStock ? p.stockActual : '∞'}
-                    </span>
-                    {p.controlaStock && (
-                        <button onClick={() => handleEditStock(p.id, p.stockActual)} className="text-blue-500 text-xs hover:underline">Ajustar</button>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 font-bold">S/ {p.precio.toFixed(2)}</td>
-                <td className="px-6 py-4 text-right space-x-2">
-                  <button 
-                    onClick={() => cambiarEstadoProducto(p.id, !p.activo).then(cargarDatos)}
-                    className={`text-xs font-bold px-3 py-2 rounded-lg ${p.activo ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}
-                  >
-                    {p.activo ? "Quitar del Menú" : "Reactivar"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* MODAL SIMPLIFICADO */}
-      {openModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
-            <h3 className="text-xl font-bold mb-4">Nuevo Producto</h3>
-            <form onSubmit={handleCrear} className="space-y-4">
-              <input placeholder="Nombre" className="w-full p-3 bg-slate-100 rounded-xl" onChange={e => setFormulario({...formulario, nombre: e.target.value})} />
-              <div className="grid grid-cols-2 gap-4">
-                <input type="number" placeholder="Precio" className="w-full p-3 bg-slate-100 rounded-xl" onChange={e => setFormulario({...formulario, precio: e.target.value})} />
-                <select className="w-full p-3 bg-slate-100 rounded-xl" onChange={e => setFormulario({...formulario, areaDestino: e.target.value})}>
-                    <option value="Cocina">Cocina</option>
-                    <option value="Bar">Bar</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <input type="number" placeholder="Stock Inicial" className="w-full p-3 bg-slate-100 rounded-xl" onChange={e => setFormulario({...formulario, stockActual: e.target.value})} />
-                <input type="number" placeholder="Stock Mínimo" className="w-full p-3 bg-slate-100 rounded-xl" onChange={e => setFormulario({...formulario, stockMinimo: e.target.value})} />
-              </div>
-              <select className="w-full p-3 bg-slate-100 rounded-xl" onChange={e => setFormulario({...formulario, categoriaId: e.target.value})}>
-                <option value="">Categoría...</option>
-                {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-              </select>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setOpenModal(false)} className="flex-1 p-3">Cerrar</button>
-                <button type="submit" className="flex-1 bg-blue-600 text-white rounded-xl font-bold">Guardar</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+    );
+};
