@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://localhost:7248/api', // Asegúrate de que sea el puerto de tu backend
+    baseURL: 'https://localhost:7248/api', // Puerto HTTPS del backend .NET
     headers: {
         'Content-Type': 'application/json'
     }

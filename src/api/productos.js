@@ -45,3 +45,9 @@ export const cambiarPrecio = async (id, nuevoPrecio) => {
     });
     return response.data;
 };
+
+// DELETE (Admin)
+export const eliminarProducto = async (id) => {
+    const response = await api.delete(`/Productos/${id}`);
+    return response.data;
+};

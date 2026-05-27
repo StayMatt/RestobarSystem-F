@@ -8,7 +8,8 @@ export const abrirMesa = async (mesaId, usuarioId) => {
         MesaId: parseInt(mesaId),
         UsuarioId: parseInt(usuarioId)
     });
-    return response.data;
+    // El backend devuelve { Mensaje: "...", PedidoId: 5 } — extraemos solo el ID
+    return response.data.pedidoId ?? response.data.PedidoId ?? response.data;
 };
 
 export const enviarComanda = async (pedidoId, items) => {
@@ -24,7 +25,7 @@ export const enviarComanda = async (pedidoId, items) => {
 
 export const getPendientesPorArea = async (area) => {
     const response = await api.get(`/Pedidos/produccion/${area}`);
-    return response.data; 
+    return response.data;
 };
 
 export const cambiarEstadoPreparacion = async (id, nuevoEstado) => {
@@ -32,6 +33,14 @@ export const cambiarEstadoPreparacion = async (id, nuevoEstado) => {
     const response = await api.put(`/Pedidos/detalle/${id}/estado`, `"${nuevoEstado}"`, {
         headers: { 'Content-Type': 'application/json' }
     });
+    return response.data;
+};
+
+// --- MESERA: VER PLATOS LISTOS EN SU MESA ---
+
+export const getListosPorPedido = async (pedidoId) => {
+    // Nuevo endpoint: devuelve ítems con EstadoPrep == "Listo" del pedido indicado
+    const response = await api.get(`/Pedidos/${pedidoId}/listos`);
     return response.data;
 };
 
