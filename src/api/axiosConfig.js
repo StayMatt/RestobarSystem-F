@@ -2,22 +2,35 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://localhost:7248/api', // Puerto HTTPS del backend .NET
+    baseURL: 'https://localhost:7248/api',
     headers: {
         'Content-Type': 'application/json'
     }
 });
 
-// NUEVO: Interceptor para inyectar el token
+// Interceptor REQUEST: inyecta token
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token'); // Buscamos el token en la memoria del navegador
+        const token = localStorage.getItem('token');
         if (token) {
-            config.headers.Authorization = `Bearer ${token}`; // Se lo pegamos a la petición
+            config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
     },
+    (error) => Promise.reject(error)
+);
+
+// Interceptor RESPONSE: redirige al login si el token expira (401)
+api.interceptors.response.use(
+    (response) => response,
     (error) => {
+        if (error.response?.status === 401) {
+            // Token expirado o inválido → limpiar y redirigir
+            localStorage.removeItem('token');
+            localStorage.removeItem('rol');
+            localStorage.removeItem('nombre');
+            window.location.href = '/login';
+        }
         return Promise.reject(error);
     }
 );

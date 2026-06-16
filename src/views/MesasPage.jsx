@@ -358,8 +358,8 @@ export const MesasPage = () => {
 
             {/* ══ MODAL: CARTA / MENÚ ════════════════════════════════════ */}
             {showMenu && mesaSeleccionada && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 w-full max-w-5xl h-[85vh] rounded-3xl flex overflow-hidden shadow-2xl border border-white/10">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-2 md:p-4">
+                    <div className="bg-slate-900 w-full max-w-5xl h-[95vh] md:h-[85vh] rounded-3xl flex flex-col md:flex-row overflow-hidden shadow-2xl border border-white/10">
                         {/* Carta */}
                         <div className="flex-1 flex flex-col overflow-hidden">
                             <div className="p-6 border-b border-white/5">
@@ -391,10 +391,13 @@ export const MesasPage = () => {
                         </div>
 
                         {/* Comanda */}
-                        <div className="w-72 bg-slate-950 border-l border-white/5 flex flex-col">
-                            <div className="p-5 border-b border-white/5">
-                                <h2 className="font-black text-white">🧾 Comanda</h2>
-                                <p className="text-slate-500 text-xs mt-0.5">Mesa #{mesaSeleccionada.numero}</p>
+                        <div className="w-full md:w-72 bg-slate-950 border-t md:border-t-0 md:border-l border-white/5 flex flex-col h-[40vh] md:h-auto">
+                            <div className="p-3 md:p-5 border-b border-white/5 flex justify-between items-center md:block">
+                                <div>
+                                    <h2 className="font-black text-white">🧾 Comanda</h2>
+                                    <p className="text-slate-500 text-xs mt-0.5">Mesa #{mesaSeleccionada.numero}</p>
+                                </div>
+                                <button onClick={() => setShowMenu(false)} className="md:hidden text-slate-500 font-bold p-2 bg-slate-800 rounded-lg">✕</button>
                             </div>
                             <div className="flex-1 overflow-y-auto p-4 space-y-2">
                                 {carrito.length === 0 ? (
@@ -429,7 +432,7 @@ export const MesasPage = () => {
                                     </div>
                                 ))}
                             </div>
-                            <div className="p-4 border-t border-white/5 space-y-2">
+                            <div className="p-3 md:p-4 border-t border-white/5 space-y-2">
                                 {carrito.length > 0 && (
                                     <div className="flex justify-between text-sm text-slate-400 mb-2 px-1">
                                         <span>{carrito.reduce((acc, i) => acc + i.cantidad, 0)} items</span>
@@ -438,16 +441,18 @@ export const MesasPage = () => {
                                         </span>
                                     </div>
                                 )}
-                                <button
-                                    onClick={handleEnviarComanda}
-                                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all"
-                                >
-                                    Enviar a Cocina 🍳
-                                </button>
-                                <button onClick={() => setShowMenu(false)}
-                                    className="w-full text-slate-500 hover:text-slate-300 font-bold py-2 transition-colors text-sm">
-                                    Cerrar
-                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowMenu(false)}
+                                        className="hidden md:block w-full text-slate-500 hover:text-slate-300 font-bold py-2 transition-colors text-sm">
+                                        Cerrar
+                                    </button>
+                                    <button
+                                        onClick={handleEnviarComanda}
+                                        className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-black py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all"
+                                    >
+                                        Enviar 🍳
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
