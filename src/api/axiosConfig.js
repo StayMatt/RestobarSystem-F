@@ -2,7 +2,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://localhost:7248/api',
+    // URL de producción apuntando a Somee (Asegúrate de mantener el /api al final)
+    baseURL: 'https://elgalanbar.somee.com/api',
     headers: {
         'Content-Type': 'application/json'
     }
